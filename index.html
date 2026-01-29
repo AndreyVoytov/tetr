@@ -73,6 +73,7 @@
       joystick: { active: false, startX: 0, startY: 0, dx: 0, dy: 0 },
       sling: { x: 0, y: 0 },
       blocks: [],
+      blockSize: 0,
       balls: [],
       ammoTemplates: [],
       cooldown: 0,
@@ -104,6 +105,7 @@
       state.wallY = height * 0.58;
       state.wallThickness = width * 0.05;
       state.bottomHeight = height - state.wallY;
+      state.blockSize = Math.floor(width * 0.08);
       state.player.radius = width * 0.045;
       state.player.speed = width * 0.4;
       state.player.x = width * 0.5;
@@ -161,7 +163,7 @@
     }
 
     function spawnShape() {
-      const blockSize = state.width * 0.08;
+      const blockSize = state.blockSize;
       const template = shapeTemplates[randomRange(0, shapeTemplates.length - 1)];
       const color = colors[randomRange(0, colors.length - 1)];
       const maxX = Math.floor(state.width / blockSize) - 4;
@@ -173,6 +175,7 @@
       template.forEach(([tx, ty]) => {
         state.blocks.push({
           id: `${groupId}-${tx}-${ty}`,
+          groupId,
           x: (offsetX + tx) * blockSize,
           y: offsetY + ty * blockSize,
           size: blockSize,
@@ -187,14 +190,51 @@
 
     function updateBlocks(step) {
       const wallLimit = state.wallY - state.wallThickness * 0.2;
+      const occupied = new Set();
+      state.blocks.forEach(block => {
+        if (!block.falling) {
+          const col = Math.round(block.x / block.size);
+          const row = Math.round(block.y / block.size);
+          occupied.add(`${col}:${row}`);
+        }
+      });
+
+      const groups = new Map();
       state.blocks.forEach(block => {
         if (block.falling) {
-          block.y += step;
-          if (block.y + block.size >= wallLimit) {
-            block.y = wallLimit - block.size;
+          if (!groups.has(block.groupId)) {
+            groups.set(block.groupId, []);
+          }
+          groups.get(block.groupId).push(block);
+        }
+      });
+
+      const maxRow = Math.floor((wallLimit - step) / step);
+      groups.forEach(group => {
+        let shouldStop = false;
+        group.forEach(block => {
+          const col = Math.round(block.x / block.size);
+          const row = Math.round(block.y / block.size);
+          const nextRow = row + 1;
+          if (nextRow > maxRow || occupied.has(`${col}:${nextRow}`)) {
+            shouldStop = true;
+          }
+        });
+
+        if (shouldStop) {
+          group.forEach(block => {
+            const col = Math.round(block.x / block.size);
+            const row = Math.round(block.y / block.size);
+            const clampedRow = Math.min(row, maxRow);
+            block.y = clampedRow * block.size;
             block.falling = false;
             block.attacking = true;
-          }
+            occupied.add(`${col}:${clampedRow}`);
+          });
+        } else {
+          group.forEach(block => {
+            block.y += step;
+          });
         }
       });
     }
@@ -360,7 +400,7 @@
 
       if (fallTimer >= 1) {
         fallTimer = 0;
-        const step = state.width * 0.07;
+        const step = state.blockSize;
         updateBlocks(step);
       }
 
