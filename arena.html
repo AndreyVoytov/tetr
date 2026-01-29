@@ -36,8 +36,8 @@
       ctx.fillRect(0, 0, width, height);
     }
 
-    function drawShootZone(width, height) {
-      const zoneHeight = height * 0.2;
+    function drawShootZone(width, height, ratio = 0.2) {
+      const zoneHeight = height * ratio;
       ctx.fillStyle = "rgba(231, 76, 60, 0.35)";
       ctx.fillRect(0, height - zoneHeight, width, zoneHeight);
       ctx.fillStyle = "#fff";
@@ -92,10 +92,10 @@
       if (!renderState) {
         return;
       }
-      const { width, bottomHeight, player, sling, balls } = renderState;
+      const { width, bottomHeight, player, sling, balls, shootZoneRatio } = renderState;
       setCanvasSize(width, bottomHeight);
       drawBackground(width, bottomHeight);
-      drawShootZone(width, bottomHeight);
+      drawShootZone(width, bottomHeight, shootZoneRatio);
       drawSling(sling);
       drawPlayer(player);
       drawBalls(balls);
