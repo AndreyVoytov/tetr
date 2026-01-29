@@ -20,6 +20,12 @@
       overflow: hidden;
       touch-action: none;
     }
+    #input-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      touch-action: none;
+    }
     iframe {
       position: absolute;
       border: 0;
@@ -33,12 +39,14 @@
     <iframe id="tetris-frame" title="tetris" src="tetris.html"></iframe>
     <iframe id="arena-frame" title="arena" src="arena.html"></iframe>
     <iframe id="ui-frame" title="ui" src="ui.html"></iframe>
+    <div id="input-layer" aria-hidden="true"></div>
   </div>
   <script>
     const root = document.getElementById("game-root");
     const tetrisFrame = document.getElementById("tetris-frame");
     const arenaFrame = document.getElementById("arena-frame");
     const uiFrame = document.getElementById("ui-frame");
+    const inputLayer = document.getElementById("input-layer");
 
     const colors = ["#3bd16f", "#e74c3c", "#b0b0b0", "#f1c40f"];
     const colorTypes = {
@@ -88,6 +96,7 @@
     let spawnTimer = 0;
     let attackTimer = 0;
     let frameTimer = 0;
+    const joystickDeadzone = 30;
 
     function setupLayout() {
       const aspect = 9 / 16;
@@ -155,6 +164,7 @@
         upgradeChoices: state.upgradeChoices,
         paused: state.paused
       };
+      inputLayer.style.pointerEvents = state.upgradeChoices.length > 0 ? "none" : "auto";
       broadcast("state", payload);
     }
 
@@ -416,7 +426,7 @@
 
       if (state.joystick.active) {
         const length = Math.hypot(state.joystick.dx, state.joystick.dy);
-        if (length > 0) {
+        if (length >= joystickDeadzone) {
           const speed = state.player.speed * dt;
           const moveX = (state.joystick.dx / length) * speed;
           const moveY = (state.joystick.dy / length) * speed;
@@ -481,6 +491,35 @@
         state.joystick.dy = 0;
       }
     }
+
+    function handlePointer(action, event) {
+      const rect = root.getBoundingClientRect();
+      const x = (event.clientX - rect.left) * (state.width / rect.width);
+      const y = (event.clientY - rect.top) * (state.height / rect.height);
+      handleInput({ action, x, y });
+    }
+
+    inputLayer.addEventListener("pointerdown", event => {
+      inputLayer.setPointerCapture(event.pointerId);
+      handlePointer("start", event);
+    });
+
+    inputLayer.addEventListener("pointermove", event => {
+      if (event.pressure === 0 && event.buttons === 0) {
+        return;
+      }
+      handlePointer("move", event);
+    });
+
+    function endPointer(event) {
+      handlePointer("end", event);
+      if (inputLayer.hasPointerCapture(event.pointerId)) {
+        inputLayer.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    inputLayer.addEventListener("pointerup", endPointer);
+    inputLayer.addEventListener("pointercancel", endPointer);
 
     window.addEventListener("message", event => {
       const { type, payload } = event.data || {};

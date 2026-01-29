@@ -68,23 +68,6 @@
       ctx.fill();
     }
 
-    function drawJoystick(joystick) {
-      if (!joystick.active) {
-        return;
-      }
-      const outer = renderState.width * 0.08;
-      const inner = renderState.width * 0.04;
-      ctx.strokeStyle = "rgba(255,255,255,0.4)";
-      ctx.lineWidth = outer * 0.15;
-      ctx.beginPath();
-      ctx.arc(joystick.startX, joystick.startY - renderState.wallY, outer, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = "rgba(255,255,255,0.6)";
-      ctx.beginPath();
-      ctx.arc(joystick.startX + joystick.dx, joystick.startY + joystick.dy - renderState.wallY, inner, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
     function drawBalls(balls) {
       balls.forEach(ball => {
         const y = ball.y - renderState.wallY;
@@ -109,42 +92,14 @@
       if (!renderState) {
         return;
       }
-      const { width, bottomHeight, player, sling, joystick, balls } = renderState;
+      const { width, bottomHeight, player, sling, balls } = renderState;
       setCanvasSize(width, bottomHeight);
       drawBackground(width, bottomHeight);
       drawShootZone(width, bottomHeight);
       drawSling(sling);
       drawPlayer(player);
       drawBalls(balls);
-      drawJoystick(joystick);
     }
-
-    function sendInput(action, event) {
-      if (!renderState) {
-        return;
-      }
-      const rect = canvas.getBoundingClientRect();
-      const x = (event.clientX - rect.left) * (renderState.width / rect.width);
-      const y = (event.clientY - rect.top) * (renderState.bottomHeight / rect.height) + renderState.wallY;
-      parent.postMessage({ type: "input", payload: { action, x, y } }, "*");
-    }
-
-    canvas.addEventListener("pointerdown", event => {
-      canvas.setPointerCapture(event.pointerId);
-      sendInput("start", event);
-    });
-
-    canvas.addEventListener("pointermove", event => {
-      if (event.pressure === 0 && event.buttons === 0) {
-        return;
-      }
-      sendInput("move", event);
-    });
-
-    canvas.addEventListener("pointerup", event => {
-      sendInput("end", event);
-      canvas.releasePointerCapture(event.pointerId);
-    });
 
     window.addEventListener("message", event => {
       const { type, payload } = event.data || {};
