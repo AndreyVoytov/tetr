@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UI</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      overflow: hidden;
+      font-family: "Arial", sans-serif;
+    }
+    #ui-root {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      color: #fff;
+      pointer-events: none;
+    }
+    .panel {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 12px;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 12px;
+      pointer-events: none;
+    }
+    #level-panel {
+      top: 10px;
+    }
+    #xp-panel {
+      top: 50px;
+      width: 80%;
+      height: 16px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.2);
+      overflow: hidden;
+    }
+    #xp-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #8e44ad, #3498db);
+    }
+    #upgrade-overlay {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.65);
+      pointer-events: auto;
+    }
+    #upgrade-panel {
+      width: 90%;
+      background: rgba(20, 20, 20, 0.9);
+      border-radius: 16px;
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    }
+    .upgrade-card {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      padding: 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+    .upgrade-card:hover {
+      transform: scale(1.03);
+    }
+    .upgrade-icon {
+      font-size: 28px;
+      margin-bottom: 6px;
+    }
+    .upgrade-title {
+      font-weight: bold;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    .upgrade-desc {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <div id="ui-root"></div>
+  <script>
+    const root = document.getElementById("ui-root");
+    let levelPanel;
+    let xpPanel;
+    let xpFill;
+    let upgradeOverlay;
+    let upgradePanel;
+
+    function createLevelPanel() {
+      levelPanel = document.createElement("div");
+      levelPanel.id = "level-panel";
+      levelPanel.className = "panel";
+      root.appendChild(levelPanel);
+    }
+
+    function createXpPanel() {
+      xpPanel = document.createElement("div");
+      xpPanel.id = "xp-panel";
+      xpPanel.className = "panel";
+      xpFill = document.createElement("div");
+      xpFill.id = "xp-fill";
+      xpPanel.appendChild(xpFill);
+      root.appendChild(xpPanel);
+    }
+
+    function createUpgradeOverlay() {
+      upgradeOverlay = document.createElement("div");
+      upgradeOverlay.id = "upgrade-overlay";
+      upgradePanel = document.createElement("div");
+      upgradePanel.id = "upgrade-panel";
+      upgradeOverlay.appendChild(upgradePanel);
+      root.appendChild(upgradeOverlay);
+    }
+
+    function ensureUI() {
+      if (!levelPanel) {
+        createLevelPanel();
+      }
+      if (!xpPanel) {
+        createXpPanel();
+      }
+      if (!upgradeOverlay) {
+        createUpgradeOverlay();
+      }
+    }
+
+    function updateLevelPanel(level) {
+      levelPanel.textContent = `Уровень ${level}`;
+    }
+
+    function updateXpPanel(xp, xpToLevel) {
+      const ratio = xpToLevel > 0 ? xp / xpToLevel : 0;
+      xpFill.style.width = `${Math.min(1, ratio) * 100}%`;
+    }
+
+    function clearUpgradeCards() {
+      upgradePanel.innerHTML = "";
+    }
+
+    function createUpgradeCard(upgrade) {
+      const card = document.createElement("div");
+      card.className = "upgrade-card";
+      const icon = document.createElement("div");
+      icon.className = "upgrade-icon";
+      icon.textContent = upgrade.icon || "✨";
+      const title = document.createElement("div");
+      title.className = "upgrade-title";
+      title.textContent = upgrade.title;
+      const desc = document.createElement("div");
+      desc.className = "upgrade-desc";
+      desc.textContent = upgrade.description;
+      card.appendChild(icon);
+      card.appendChild(title);
+      card.appendChild(desc);
+      card.addEventListener("click", () => {
+        parent.postMessage({ type: "upgradeSelect", payload: { id: upgrade.id } }, "*");
+      });
+      upgradePanel.appendChild(card);
+    }
+
+    function updateUpgradeOverlay(upgrades) {
+      if (!upgrades || upgrades.length === 0) {
+        upgradeOverlay.style.display = "none";
+        return;
+      }
+      clearUpgradeCards();
+      upgrades.forEach(createUpgradeCard);
+      upgradeOverlay.style.display = "flex";
+    }
+
+    window.addEventListener("message", event => {
+      const { type, payload } = event.data || {};
+      if (type === "state") {
+        ensureUI();
+        updateLevelPanel(payload.level);
+        updateXpPanel(payload.xp, payload.xpToLevel);
+        updateUpgradeOverlay(payload.upgradeChoices);
+      }
+    });
+  </script>
+</body>
+</html>

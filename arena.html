@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arena</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      overflow: hidden;
+      touch-action: none;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="arena"></canvas>
+  <script>
+    const canvas = document.getElementById("arena");
+    const ctx = canvas.getContext("2d");
+    let renderState = null;
+
+    function setCanvasSize(width, height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    function drawBackground(width, height) {
+      ctx.fillStyle = "#0b1320";
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    function drawShootZone(width, height) {
+      const zoneHeight = height * 0.2;
+      ctx.fillStyle = "rgba(231, 76, 60, 0.35)";
+      ctx.fillRect(0, height - zoneHeight, width, zoneHeight);
+      ctx.fillStyle = "#fff";
+      ctx.font = `${Math.max(12, width * 0.04)}px Arial`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Отпустите в зоне для выстрела", width * 0.5, height - zoneHeight * 0.5);
+    }
+
+    function drawSling(sling) {
+      const radius = renderState.width * 0.035;
+      ctx.fillStyle = "#d35400";
+      ctx.beginPath();
+      ctx.arc(sling.x, sling.y - renderState.wallY, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#f39c12";
+      ctx.lineWidth = radius * 0.4;
+      ctx.beginPath();
+      ctx.moveTo(sling.x - radius, sling.y - renderState.wallY + radius);
+      ctx.lineTo(sling.x + radius, sling.y - renderState.wallY + radius);
+      ctx.stroke();
+    }
+
+    function drawPlayer(player) {
+      ctx.fillStyle = "#3498db";
+      ctx.beginPath();
+      ctx.arc(player.x, player.y - renderState.wallY, player.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawJoystick(joystick) {
+      if (!joystick.active) {
+        return;
+      }
+      const outer = renderState.width * 0.08;
+      const inner = renderState.width * 0.04;
+      ctx.strokeStyle = "rgba(255,255,255,0.4)";
+      ctx.lineWidth = outer * 0.15;
+      ctx.beginPath();
+      ctx.arc(joystick.startX, joystick.startY - renderState.wallY, outer, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.beginPath();
+      ctx.arc(joystick.startX + joystick.dx, joystick.startY + joystick.dy - renderState.wallY, inner, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawBalls(balls) {
+      balls.forEach(ball => {
+        const y = ball.y - renderState.wallY;
+        ctx.fillStyle = ball.color || "#ecf0f1";
+        ctx.beginPath();
+        ctx.arc(ball.x, y, ball.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#000";
+        ctx.font = `${Math.max(10, ball.radius * 1.6)}px Arial`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(ball.power, ball.x, y);
+        if (ball.label) {
+          ctx.fillStyle = "#fff";
+          ctx.font = `${Math.max(9, ball.radius)}px Arial`;
+          ctx.fillText(ball.label, ball.x, y + ball.radius * 1.6);
+        }
+      });
+    }
+
+    function render() {
+      if (!renderState) {
+        return;
+      }
+      const { width, bottomHeight, player, sling, joystick, balls } = renderState;
+      setCanvasSize(width, bottomHeight);
+      drawBackground(width, bottomHeight);
+      drawShootZone(width, bottomHeight);
+      drawSling(sling);
+      drawPlayer(player);
+      drawBalls(balls);
+      drawJoystick(joystick);
+    }
+
+    function sendInput(action, event) {
+      if (!renderState) {
+        return;
+      }
+      const rect = canvas.getBoundingClientRect();
+      const x = (event.clientX - rect.left) * (renderState.width / rect.width);
+      const y = (event.clientY - rect.top) * (renderState.bottomHeight / rect.height) + renderState.wallY;
+      parent.postMessage({ type: "input", payload: { action, x, y } }, "*");
+    }
+
+    canvas.addEventListener("pointerdown", event => {
+      canvas.setPointerCapture(event.pointerId);
+      sendInput("start", event);
+    });
+
+    canvas.addEventListener("pointermove", event => {
+      if (event.pressure === 0) {
+        return;
+      }
+      sendInput("move", event);
+    });
+
+    canvas.addEventListener("pointerup", event => {
+      sendInput("end", event);
+      canvas.releasePointerCapture(event.pointerId);
+    });
+
+    window.addEventListener("message", event => {
+      const { type, payload } = event.data || {};
+      if (type === "state") {
+        renderState = payload;
+        render();
+      }
+      if (type === "layout" && payload) {
+        setCanvasSize(payload.width, payload.bottomHeight);
+      }
+    });
+  </script>
+</body>
+</html>

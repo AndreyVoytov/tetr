@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tetr Wall Defense</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: #000;
+      font-family: "Arial", sans-serif;
+      overflow: hidden;
+    }
+    #game-root {
+      position: relative;
+      margin: 0 auto;
+      background: #121212;
+      overflow: hidden;
+      touch-action: none;
+    }
+    iframe {
+      position: absolute;
+      border: 0;
+      width: 100%;
+      left: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-root">
+    <iframe id="tetris-frame" title="tetris" src="tetris.html"></iframe>
+    <iframe id="arena-frame" title="arena" src="arena.html"></iframe>
+    <iframe id="ui-frame" title="ui" src="ui.html"></iframe>
+  </div>
+  <script>
+    const root = document.getElementById("game-root");
+    const tetrisFrame = document.getElementById("tetris-frame");
+    const arenaFrame = document.getElementById("arena-frame");
+    const uiFrame = document.getElementById("ui-frame");
+
+    const colors = ["#3bd16f", "#e74c3c", "#b0b0b0", "#f1c40f"];
+    const colorTypes = {
+      "#3bd16f": "green",
+      "#e74c3c": "red",
+      "#b0b0b0": "gray",
+      "#f1c40f": "yellow"
+    };
+
+    const shapeTemplates = [
+      [[0,0],[1,0]],
+      [[0,0],[1,0],[0,1]],
+      [[0,0],[1,0],[2,0]],
+      [[0,0],[0,1],[1,1],[2,1]],
+      [[0,0],[1,0],[0,1],[1,1]],
+      [[0,0],[1,0],[2,0],[3,0]],
+      [[0,0],[1,0],[2,0],[2,1],[2,2]],
+      [[0,0],[1,0],[1,1],[2,1],[3,1]]
+    ];
+
+    const state = {
+      width: 360,
+      height: 640,
+      wallY: 0,
+      wallThickness: 0,
+      bottomHeight: 0,
+      level: 1,
+      xp: 0,
+      xpToLevel: 10,
+      wall: { hp: 100, max: 100 },
+      player: { x: 0, y: 0, radius: 0, speed: 0 },
+      joystick: { active: false, startX: 0, startY: 0, dx: 0, dy: 0 },
+      sling: { x: 0, y: 0 },
+      blocks: [],
+      balls: [],
+      ammoTemplates: [],
+      cooldown: 0,
+      upgrades: [],
+      upgradeChoices: [],
+      paused: false
+    };
+
+    let upgradesConfig = [];
+    let lastTime = 0;
+    let fallTimer = 0;
+    let spawnTimer = 0;
+    let attackTimer = 0;
+    let frameTimer = 0;
+
+    function setupLayout() {
+      const aspect = 9 / 16;
+      const maxWidth = window.innerWidth;
+      const maxHeight = window.innerHeight;
+      const width = Math.min(maxWidth, Math.floor(maxHeight * aspect));
+      const height = Math.floor(width / aspect);
+
+      root.style.width = `${width}px`;
+      root.style.height = `${height}px`;
+      root.style.marginTop = `${Math.floor((maxHeight - height) / 2)}px`;
+
+      state.width = width;
+      state.height = height;
+      state.wallY = height * 0.58;
+      state.wallThickness = width * 0.05;
+      state.bottomHeight = height - state.wallY;
+      state.player.radius = width * 0.045;
+      state.player.speed = width * 0.4;
+      state.player.x = width * 0.5;
+      state.player.y = state.wallY + state.bottomHeight * 0.65;
+      state.sling.x = width * 0.5;
+      state.sling.y = state.wallY + state.bottomHeight * 0.25;
+
+      tetrisFrame.style.top = "0px";
+      tetrisFrame.style.height = `${state.wallY + state.wallThickness}px`;
+      arenaFrame.style.top = `${state.wallY}px`;
+      arenaFrame.style.height = `${state.bottomHeight}px`;
+      uiFrame.style.top = "0px";
+      uiFrame.style.height = `${height}px`;
+
+      broadcast("layout", {
+        width: state.width,
+        height: state.height,
+        wallY: state.wallY,
+        wallThickness: state.wallThickness,
+        bottomHeight: state.bottomHeight
+      });
+    }
+
+    function broadcast(type, payload) {
+      [tetrisFrame, arenaFrame, uiFrame].forEach(frame => {
+        frame.contentWindow?.postMessage({ type, payload }, "*");
+      });
+    }
+
+    function sendState() {
+      const payload = {
+        width: state.width,
+        height: state.height,
+        wallY: state.wallY,
+        wallThickness: state.wallThickness,
+        bottomHeight: state.bottomHeight,
+        level: state.level,
+        xp: state.xp,
+        xpToLevel: state.xpToLevel,
+        wall: state.wall,
+        player: state.player,
+        sling: state.sling,
+        joystick: state.joystick,
+        blocks: state.blocks,
+        balls: state.balls,
+        ammoTemplates: state.ammoTemplates,
+        upgradeChoices: state.upgradeChoices,
+        paused: state.paused
+      };
+      broadcast("state", payload);
+    }
+
+    function randomRange(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function spawnShape() {
+      const blockSize = state.width * 0.08;
+      const template = shapeTemplates[randomRange(0, shapeTemplates.length - 1)];
+      const color = colors[randomRange(0, colors.length - 1)];
+      const maxX = Math.floor(state.width / blockSize) - 4;
+      const offsetX = randomRange(0, Math.max(1, maxX));
+      const offsetY = -blockSize * 2;
+      const power = randomRange(1, 7) * state.level;
+      const groupId = Date.now() + Math.random();
+
+      template.forEach(([tx, ty]) => {
+        state.blocks.push({
+          id: `${groupId}-${tx}-${ty}`,
+          x: (offsetX + tx) * blockSize,
+          y: offsetY + ty * blockSize,
+          size: blockSize,
+          color,
+          type: colorTypes[color],
+          power,
+          falling: true,
+          attacking: false
+        });
+      });
+    }
+
+    function updateBlocks(step) {
+      const wallLimit = state.wallY - state.wallThickness * 0.2;
+      state.blocks.forEach(block => {
+        if (block.falling) {
+          block.y += step;
+          if (block.y + block.size >= wallLimit) {
+            block.y = wallLimit - block.size;
+            block.falling = false;
+            block.attacking = true;
+          }
+        }
+      });
+    }
+
+    function applyWallDamage() {
+      const attackers = state.blocks.filter(block => block.attacking).length;
+      if (attackers > 0) {
+        state.wall.hp = Math.max(0, state.wall.hp - attackers);
+      }
+    }
+
+    function restoreAmmo() {
+      state.ammoTemplates = [
+        { type: "normal", power: 1, color: "#7f8c8d" },
+        { type: "normal", power: 1, color: "#3498db" },
+        { type: "normal", power: 1, color: "#9b59b6" }
+      ];
+      state.upgrades.forEach(upgrade => {
+        if (upgrade.type === "add_ball" && upgrade.ball) {
+          state.ammoTemplates.push({
+            type: upgrade.ball.type,
+            power: upgrade.ball.power,
+            color: upgrade.ball.color,
+            label: upgrade.ball.label
+          });
+        }
+      });
+      state.upgrades.forEach(upgrade => {
+        if (upgrade.type === "boost" && upgrade.target) {
+          state.ammoTemplates.forEach(ball => {
+            if (ball.type === upgrade.target) {
+              ball.power += upgrade.amount;
+            }
+          });
+        }
+      });
+    }
+
+    function shootVolley() {
+      if (state.cooldown > 0 || state.ammoTemplates.length === 0) {
+        return;
+      }
+      const dirX = state.player.x - state.sling.x;
+      const dirY = state.player.y - state.sling.y;
+      const length = Math.hypot(dirX, dirY) || 1;
+      const speed = state.width * 0.6;
+      const vx = (dirX / length) * speed;
+      const vy = (dirY / length) * speed;
+
+      state.ammoTemplates.forEach((ammo, index) => {
+        state.balls.push({
+          id: `${Date.now()}-${index}`,
+          x: state.sling.x,
+          y: state.sling.y,
+          radius: state.width * 0.02,
+          vx,
+          vy,
+          power: ammo.power,
+          type: ammo.type,
+          color: ammo.color,
+          label: ammo.label,
+          material: false
+        });
+      });
+
+      state.ammoTemplates = [];
+      state.cooldown = 1;
+    }
+
+    function handleBallCollisions(ball) {
+      if (!ball.material) {
+        return;
+      }
+      for (let i = 0; i < state.blocks.length; i += 1) {
+        const block = state.blocks[i];
+        const hit = ball.x + ball.radius > block.x &&
+          ball.x - ball.radius < block.x + block.size &&
+          ball.y + ball.radius > block.y &&
+          ball.y - ball.radius < block.y + block.size;
+        if (hit) {
+          const vulnerable = (ball.type === "fire" && block.type === "green") ||
+            (ball.type === "ice" && block.type === "red") ||
+            (ball.type === "dark" && block.type === "yellow");
+          const damage = vulnerable ? 2 : 1;
+          block.power -= damage;
+          ball.power -= 1;
+          if (block.power <= 0) {
+            state.blocks.splice(i, 1);
+            state.xp += 1;
+          }
+          break;
+        }
+      }
+    }
+
+    function checkLevelUp() {
+      if (state.xp >= state.xpToLevel) {
+        state.xp -= state.xpToLevel;
+        state.level += 1;
+        state.xpToLevel = Math.floor(state.xpToLevel * 1.4) + 2;
+        state.upgradeChoices = pickUpgrades();
+        state.paused = true;
+      }
+    }
+
+    function pickUpgrades() {
+      if (upgradesConfig.length === 0) {
+        return [];
+      }
+      const choices = [];
+      const pool = [...upgradesConfig];
+      while (choices.length < 3 && pool.length > 0) {
+        const index = randomRange(0, pool.length - 1);
+        choices.push(pool.splice(index, 1)[0]);
+      }
+      return choices;
+    }
+
+    function applyUpgrade(upgradeId) {
+      const found = upgradesConfig.find(upgrade => upgrade.id === upgradeId);
+      if (!found) {
+        return;
+      }
+      if (found.type === "add_ball") {
+        state.upgrades.push({
+          type: "add_ball",
+          ball: {
+            type: found.ballType,
+            power: found.basePower + state.level,
+            color: found.color,
+            label: found.label
+          }
+        });
+      }
+      if (found.type === "boost") {
+        const amount = randomRange(found.min, found.max) * state.level;
+        state.upgrades.push({
+          type: "boost",
+          target: found.target,
+          amount
+        });
+      }
+      state.upgradeChoices = [];
+      state.paused = false;
+      restoreAmmo();
+    }
+
+    function update(dt) {
+      if (state.paused) {
+        return;
+      }
+      frameTimer += dt;
+      fallTimer += dt;
+      spawnTimer += dt;
+      attackTimer += dt;
+
+      if (state.cooldown > 0) {
+        state.cooldown = Math.max(0, state.cooldown - dt);
+        if (state.cooldown === 0) {
+          restoreAmmo();
+        }
+      }
+
+      if (fallTimer >= 1) {
+        fallTimer = 0;
+        const step = state.width * 0.07;
+        updateBlocks(step);
+      }
+
+      if (spawnTimer >= 3) {
+        spawnTimer = 0;
+        spawnShape();
+      }
+
+      if (attackTimer >= 1) {
+        attackTimer = 0;
+        applyWallDamage();
+      }
+
+      if (state.joystick.active) {
+        const length = Math.hypot(state.joystick.dx, state.joystick.dy);
+        if (length > 0) {
+          const speed = state.player.speed * dt;
+          const moveX = (state.joystick.dx / length) * speed;
+          const moveY = (state.joystick.dy / length) * speed;
+          state.player.x = Math.min(Math.max(state.player.x + moveX, state.player.radius), state.width - state.player.radius);
+          const minY = state.wallY + state.player.radius + state.wallThickness * 0.4;
+          const maxY = state.height - state.player.radius;
+          state.player.y = Math.min(Math.max(state.player.y + moveY, minY), maxY);
+        }
+      }
+
+      state.balls.forEach(ball => {
+        ball.x += ball.vx * dt;
+        ball.y += ball.vy * dt;
+
+        if (ball.x - ball.radius <= 0 || ball.x + ball.radius >= state.width) {
+          ball.vx *= -1;
+          ball.x = Math.min(Math.max(ball.x, ball.radius), state.width - ball.radius);
+        }
+        if (ball.y + ball.radius >= state.height) {
+          ball.vy *= -1;
+          ball.y = state.height - ball.radius;
+        }
+        if (ball.y - ball.radius <= 0) {
+          ball.vy = Math.abs(ball.vy);
+          ball.y = ball.radius;
+          if (!ball.material) {
+            ball.material = true;
+            if (ball.type === "heal") {
+              state.wall.hp = Math.min(state.wall.max, state.wall.hp + 10 + state.level);
+              ball.power = 0;
+            }
+          }
+        }
+        handleBallCollisions(ball);
+      });
+
+      state.balls = state.balls.filter(ball => ball.power > 0);
+      checkLevelUp();
+    }
+
+    function handleInput(message) {
+      const { action, x, y } = message;
+      if (action === "start") {
+        state.joystick.active = true;
+        state.joystick.startX = x;
+        state.joystick.startY = y;
+        state.joystick.dx = 0;
+        state.joystick.dy = 0;
+      }
+      if (action === "move" && state.joystick.active) {
+        state.joystick.dx = x - state.joystick.startX;
+        state.joystick.dy = y - state.joystick.startY;
+      }
+      if (action === "end") {
+        const shootZoneTop = state.height - state.bottomHeight * 0.2;
+        const inShootZone = state.player.y >= shootZoneTop;
+        if (inShootZone) {
+          shootVolley();
+        }
+        state.joystick.active = false;
+        state.joystick.dx = 0;
+        state.joystick.dy = 0;
+      }
+    }
+
+    window.addEventListener("message", event => {
+      const { type, payload } = event.data || {};
+      if (type === "input") {
+        handleInput(payload);
+      }
+      if (type === "upgradeSelect") {
+        applyUpgrade(payload.id);
+      }
+    });
+
+    async function loadUpgrades() {
+      try {
+        const response = await fetch("upgrades.json");
+        upgradesConfig = await response.json();
+      } catch (error) {
+        upgradesConfig = [];
+      }
+    }
+
+    function loop(timestamp) {
+      if (!lastTime) {
+        lastTime = timestamp;
+      }
+      const dt = Math.min(0.033, (timestamp - lastTime) / 1000);
+      lastTime = timestamp;
+
+      update(dt);
+      sendState();
+      requestAnimationFrame(loop);
+    }
+
+    window.addEventListener("resize", setupLayout);
+
+    loadUpgrades().then(() => {
+      restoreAmmo();
+      setupLayout();
+      requestAnimationFrame(loop);
+    });
+  </script>
+</body>
+</html>

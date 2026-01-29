@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tetris Zone</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="tetris"></canvas>
+  <script>
+    const canvas = document.getElementById("tetris");
+    const ctx = canvas.getContext("2d");
+    let renderState = null;
+
+    function setCanvasSize(width, height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    function drawBackground(width, height) {
+      ctx.fillStyle = "#101820";
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    function drawBlocks(blocks) {
+      blocks.forEach(block => {
+        ctx.fillStyle = block.color;
+        ctx.fillRect(block.x, block.y, block.size, block.size);
+        ctx.strokeStyle = "rgba(0,0,0,0.4)";
+        ctx.strokeRect(block.x, block.y, block.size, block.size);
+        ctx.fillStyle = "#000";
+        ctx.font = `${Math.max(10, block.size * 0.35)}px Arial`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(block.power, block.x + block.size * 0.5, block.y + block.size * 0.55);
+      });
+    }
+
+    function drawWall(wall, width, wallY, wallThickness) {
+      const barWidth = width * 0.9;
+      const barHeight = wallThickness;
+      const x = (width - barWidth) / 2;
+      const y = wallY - barHeight * 0.5;
+      ctx.fillStyle = "#222";
+      ctx.fillRect(x, y, barWidth, barHeight);
+      const ratio = wall.hp / wall.max;
+      ctx.fillStyle = ratio > 0.5 ? "#2ecc71" : ratio > 0.2 ? "#f1c40f" : "#e74c3c";
+      ctx.fillRect(x, y, barWidth * ratio, barHeight);
+      ctx.strokeStyle = "#fff";
+      ctx.strokeRect(x, y, barWidth, barHeight);
+      ctx.fillStyle = "#fff";
+      ctx.font = `${Math.max(12, wallThickness * 0.6)}px Arial`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(`Стена ${Math.round(wall.hp)}/100`, width * 0.5, y + barHeight * 0.5);
+    }
+
+    function render() {
+      if (!renderState) {
+        return;
+      }
+      const { width, wallY, wallThickness, blocks, wall } = renderState;
+      const height = wallY + wallThickness;
+      setCanvasSize(width, height);
+      drawBackground(width, height);
+      drawBlocks(blocks);
+      drawWall(wall, width, wallY, wallThickness);
+    }
+
+    window.addEventListener("message", event => {
+      const { type, payload } = event.data || {};
+      if (type === "state") {
+        renderState = payload;
+        render();
+      }
+      if (type === "layout" && payload) {
+        setCanvasSize(payload.width, payload.wallY + payload.wallThickness);
+      }
+    });
+  </script>
+</body>
+</html>

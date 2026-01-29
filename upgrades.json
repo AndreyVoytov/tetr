@@ -1,0 +1,76 @@
+[
+  {
+    "id": "heal_orb",
+    "title": "Лечащий шар",
+    "description": "Зелёный шар с плюсиком лечит стену.",
+    "icon": "➕",
+    "type": "add_ball",
+    "ballType": "heal",
+    "color": "#2ecc71",
+    "label": "+",
+    "basePower": 1
+  },
+  {
+    "id": "fire_orb",
+    "title": "Огненный шар",
+    "description": "Сильнее против зелёных блоков.",
+    "icon": "🔥",
+    "type": "add_ball",
+    "ballType": "fire",
+    "color": "#e74c3c",
+    "label": "F",
+    "basePower": 1
+  },
+  {
+    "id": "ice_orb",
+    "title": "Ледяной шар",
+    "description": "Сильнее против красных блоков.",
+    "icon": "❄️",
+    "type": "add_ball",
+    "ballType": "ice",
+    "color": "#3498db",
+    "label": "I",
+    "basePower": 1
+  },
+  {
+    "id": "dark_orb",
+    "title": "Шар тьмы",
+    "description": "Сильнее против жёлтых блоков.",
+    "icon": "🟣",
+    "type": "add_ball",
+    "ballType": "dark",
+    "color": "#8e44ad",
+    "label": "D",
+    "basePower": 1
+  },
+  {
+    "id": "fire_boost",
+    "title": "Усиление огня",
+    "description": "Огненные шары +2-5 * уровень.",
+    "icon": "🔥",
+    "type": "boost",
+    "target": "fire",
+    "min": 2,
+    "max": 5
+  },
+  {
+    "id": "ice_boost",
+    "title": "Усиление льда",
+    "description": "Ледяные шары +3-4 * уровень.",
+    "icon": "❄️",
+    "type": "boost",
+    "target": "ice",
+    "min": 3,
+    "max": 4
+  },
+  {
+    "id": "dark_boost",
+    "title": "Усиление тьмы",
+    "description": "Шары тьмы +1-6 * уровень.",
+    "icon": "🟣",
+    "type": "boost",
+    "target": "dark",
+    "min": 1,
+    "max": 6
+  }
+]
