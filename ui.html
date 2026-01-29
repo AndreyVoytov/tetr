@@ -61,6 +61,30 @@
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
       pointer-events: none;
     }
+    #charge-panel {
+      top: 80px;
+      width: 60%;
+      height: 12px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.18);
+      overflow: hidden;
+    }
+    #charge-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #27ae60, #2ecc71);
+    }
+    #charge-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #fff;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+      pointer-events: none;
+      letter-spacing: 0.4px;
+    }
     #upgrade-overlay {
       position: absolute;
       inset: 0;
@@ -118,6 +142,9 @@
     let xpPanel;
     let xpFill;
     let xpText;
+    let chargePanel;
+    let chargeFill;
+    let chargeText;
     let upgradeOverlay;
     let upgradePanel;
     let lastState;
@@ -142,6 +169,19 @@
       root.appendChild(xpPanel);
     }
 
+    function createChargePanel() {
+      chargePanel = document.createElement("div");
+      chargePanel.id = "charge-panel";
+      chargePanel.className = "panel";
+      chargeFill = document.createElement("div");
+      chargeFill.id = "charge-fill";
+      chargeText = document.createElement("div");
+      chargeText.id = "charge-text";
+      chargePanel.appendChild(chargeFill);
+      chargePanel.appendChild(chargeText);
+      root.appendChild(chargePanel);
+    }
+
     function createUpgradeOverlay() {
       upgradeOverlay = document.createElement("div");
       upgradeOverlay.id = "upgrade-overlay";
@@ -158,6 +198,9 @@
       if (!xpPanel) {
         createXpPanel();
       }
+      if (!chargePanel) {
+        createChargePanel();
+      }
       if (!upgradeOverlay) {
         createUpgradeOverlay();
       }
@@ -171,6 +214,13 @@
       const ratio = xpToLevel > 0 ? xp / xpToLevel : 0;
       xpFill.style.width = `${Math.min(1, ratio) * 100}%`;
       xpText.textContent = `${xp}/${xpToLevel}`;
+    }
+
+    function updateChargePanel(cooldown, cooldownDuration) {
+      const duration = cooldownDuration > 0 ? cooldownDuration : 1;
+      const ratio = Math.max(0, Math.min(1, 1 - cooldown / duration));
+      chargeFill.style.width = `${ratio * 100}%`;
+      chargeText.textContent = `ЗАРЯД ${Math.round(ratio * 100)}%`;
     }
 
     function clearUpgradeCards() {
@@ -237,6 +287,7 @@
         }
         updateLevelPanel(payload.level);
         updateXpPanel(payload.xp, payload.xpToLevel);
+        updateChargePanel(payload.cooldown, payload.cooldownDuration);
         updateUpgradeOverlay(payload.upgradeChoices);
         drawJoystick(payload);
         lastState = payload;
