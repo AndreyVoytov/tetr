@@ -23,7 +23,7 @@
     #input-layer {
       position: absolute;
       inset: 0;
-      z-index: 10;
+      z-index: 40;
       touch-action: none;
     }
     iframe {
@@ -31,6 +31,15 @@
       border: 0;
       width: 100%;
       left: 0;
+    }
+    #tetris-frame {
+      z-index: 10;
+    }
+    #arena-frame {
+      z-index: 20;
+    }
+    #ui-frame {
+      z-index: 30;
     }
   </style>
 </head>
@@ -356,7 +365,7 @@
         state.level += 1;
         state.xpToLevel = state.level * 10;
         state.upgradeChoices = pickUpgrades();
-        state.paused = true;
+        state.paused = state.upgradeChoices.length > 0;
       }
     }
 
