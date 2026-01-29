@@ -49,6 +49,31 @@
       });
     }
 
+    function drawBalls(balls) {
+      balls.forEach(ball => {
+        if (ball.y > renderState.wallY + renderState.wallThickness) {
+          return;
+        }
+        ctx.save();
+        ctx.globalAlpha = 0.6;
+        ctx.fillStyle = ball.color || "#ecf0f1";
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        ctx.fillStyle = "#000";
+        ctx.font = `${Math.max(10, ball.radius * 1.6)}px Arial`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(ball.power, ball.x, ball.y);
+        if (ball.label) {
+          ctx.fillStyle = "#fff";
+          ctx.font = `${Math.max(9, ball.radius)}px Arial`;
+          ctx.fillText(ball.label, ball.x, ball.y + ball.radius * 1.6);
+        }
+      });
+    }
+
     function drawWall(wall, width, wallY, wallThickness) {
       const barWidth = width * 0.9;
       const barHeight = wallThickness;
@@ -72,11 +97,12 @@
       if (!renderState) {
         return;
       }
-      const { width, wallY, wallThickness, blocks, wall } = renderState;
+      const { width, wallY, wallThickness, blocks, wall, balls } = renderState;
       const height = wallY + wallThickness;
       setCanvasSize(width, height);
       drawBackground(width, height);
       drawBlocks(blocks);
+      drawBalls(balls);
       drawWall(wall, width, wallY, wallThickness);
     }
 

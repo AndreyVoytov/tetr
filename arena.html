@@ -70,11 +70,17 @@
 
     function drawBalls(balls) {
       balls.forEach(ball => {
+        if (ball.y < renderState.wallY) {
+          return;
+        }
         const y = ball.y - renderState.wallY;
+        ctx.save();
+        ctx.globalAlpha = 0.6;
         ctx.fillStyle = ball.color || "#ecf0f1";
         ctx.beginPath();
         ctx.arc(ball.x, y, ball.radius, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
         ctx.fillStyle = "#000";
         ctx.font = `${Math.max(10, ball.radius * 1.6)}px Arial`;
         ctx.textAlign = "center";
