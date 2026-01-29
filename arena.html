@@ -135,7 +135,7 @@
     });
 
     canvas.addEventListener("pointermove", event => {
-      if (event.pressure === 0) {
+      if (event.pressure === 0 && event.buttons === 0) {
         return;
       }
       sendInput("move", event);
