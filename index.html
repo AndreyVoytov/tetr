@@ -86,6 +86,7 @@
       balls: [],
       ammoTemplates: [],
       cooldown: 0,
+      cooldownDuration: 1,
       upgrades: [],
       upgradeChoices: [],
       paused: false
@@ -163,6 +164,8 @@
         blocks: state.blocks,
         balls: state.balls,
         ammoTemplates: state.ammoTemplates,
+        cooldown: state.cooldown,
+        cooldownDuration: state.cooldownDuration,
         upgradeChoices: state.upgradeChoices,
         paused: state.paused
       };
@@ -293,10 +296,15 @@
       const dirY = state.sling.y - state.player.y;
       const length = Math.hypot(dirX, dirY) || 1;
       const speed = state.width * 0.6;
-      const vx = (dirX / length) * speed;
-      const vy = (dirY / length) * speed;
+      const baseAngle = Math.atan2(dirY, dirX);
+      const count = state.ammoTemplates.length;
+      const spreadStep = count > 1 ? 0.12 : 0;
 
       state.ammoTemplates.forEach((ammo, index) => {
+        const offset = (index - (count - 1) / 2) * spreadStep;
+        const angle = baseAngle + offset;
+        const vx = Math.cos(angle) * speed;
+        const vy = Math.sin(angle) * speed;
         state.balls.push({
           id: `${Date.now()}-${index}`,
           x: state.sling.x,
@@ -313,7 +321,7 @@
       });
 
       state.ammoTemplates = [];
-      state.cooldown = 1;
+      state.cooldown = state.cooldownDuration;
     }
 
     function handleBallCollisions(ball) {
