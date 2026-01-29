@@ -90,7 +90,7 @@
       ctx.font = `${Math.max(12, wallThickness * 0.6)}px Arial`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(`Стена ${Math.round(wall.hp)}/100`, width * 0.5, y + barHeight * 0.5);
+      ctx.fillText(`Стена ${Math.round(wall.hp)}/${wall.max}`, width * 0.5, y + barHeight * 0.5);
     }
 
     function render() {

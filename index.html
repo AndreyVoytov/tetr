@@ -77,7 +77,7 @@
       level: 1,
       xp: 0,
       xpToLevel: 10,
-      wall: { hp: 100, max: 100 },
+      wall: { hp: 500, max: 500 },
       player: { x: 0, y: 0, radius: 0, speed: 0 },
       joystick: { active: false, startX: 0, startY: 0, dx: 0, dy: 0 },
       sling: { x: 0, y: 0 },
@@ -346,7 +346,7 @@
       if (state.xp >= state.xpToLevel) {
         state.xp -= state.xpToLevel;
         state.level += 1;
-        state.xpToLevel = Math.floor(state.xpToLevel * 1.4) + 2;
+        state.xpToLevel = state.level * 10;
         state.upgradeChoices = pickUpgrades();
         state.paused = true;
       }
@@ -439,7 +439,9 @@
         }
       }
 
+      const wallTop = state.wallY - state.wallThickness * 0.5;
       state.balls.forEach(ball => {
+        const prevY = ball.y;
         ball.x += ball.vx * dt;
         ball.y += ball.vy * dt;
 
@@ -451,16 +453,20 @@
           ball.vy *= -1;
           ball.y = state.height - ball.radius;
         }
+        if (ball.material && ball.vy > 0 && prevY + ball.radius < wallTop && ball.y + ball.radius >= wallTop) {
+          ball.power = 0;
+          return;
+        }
+        if (!ball.material && prevY - ball.radius > wallTop && ball.y - ball.radius <= wallTop) {
+          ball.material = true;
+          if (ball.type === "heal") {
+            state.wall.hp = Math.min(state.wall.max, state.wall.hp + 10 + state.level);
+            ball.power = 0;
+          }
+        }
         if (ball.y - ball.radius <= 0) {
           ball.vy = Math.abs(ball.vy);
           ball.y = ball.radius;
-          if (!ball.material) {
-            ball.material = true;
-            if (ball.type === "heal") {
-              state.wall.hp = Math.min(state.wall.max, state.wall.hp + 10 + state.level);
-              ball.power = 0;
-            }
-          }
         }
         handleBallCollisions(ball);
       });
