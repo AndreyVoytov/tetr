@@ -73,6 +73,7 @@
       wallY: 0,
       wallThickness: 0,
       bottomHeight: 0,
+      shootZoneRatio: 0.35,
       level: 1,
       xp: 0,
       xpToLevel: 10,
@@ -151,6 +152,7 @@
         wallY: state.wallY,
         wallThickness: state.wallThickness,
         bottomHeight: state.bottomHeight,
+        shootZoneRatio: state.shootZoneRatio,
         level: state.level,
         xp: state.xp,
         xpToLevel: state.xpToLevel,
@@ -287,8 +289,8 @@
       if (state.cooldown > 0 || state.ammoTemplates.length === 0) {
         return;
       }
-      const dirX = state.player.x - state.sling.x;
-      const dirY = state.player.y - state.sling.y;
+      const dirX = state.sling.x - state.player.x;
+      const dirY = state.sling.y - state.player.y;
       const length = Math.hypot(dirX, dirY) || 1;
       const speed = state.width * 0.6;
       const vx = (dirX / length) * speed;
@@ -468,7 +470,7 @@
     }
 
     function handleInput(message) {
-      const { action, x, y } = message;
+      const { action, x, y, buttons } = message;
       if (action === "start") {
         state.joystick.active = true;
         state.joystick.startX = x;
@@ -476,12 +478,21 @@
         state.joystick.dx = 0;
         state.joystick.dy = 0;
       }
-      if (action === "move" && state.joystick.active) {
-        state.joystick.dx = x - state.joystick.startX;
-        state.joystick.dy = y - state.joystick.startY;
+      if (action === "move") {
+        if (!state.joystick.active && buttons > 0) {
+          state.joystick.active = true;
+          state.joystick.startX = x;
+          state.joystick.startY = y;
+          state.joystick.dx = 0;
+          state.joystick.dy = 0;
+        }
+        if (state.joystick.active) {
+          state.joystick.dx = x - state.joystick.startX;
+          state.joystick.dy = y - state.joystick.startY;
+        }
       }
       if (action === "end") {
-        const shootZoneTop = state.height - state.bottomHeight * 0.2;
+        const shootZoneTop = state.height - state.bottomHeight * state.shootZoneRatio;
         const inShootZone = state.player.y >= shootZoneTop;
         if (inShootZone) {
           shootVolley();
@@ -496,7 +507,7 @@
       const rect = root.getBoundingClientRect();
       const x = (event.clientX - rect.left) * (state.width / rect.width);
       const y = (event.clientY - rect.top) * (state.height / rect.height);
-      handleInput({ action, x, y });
+      handleInput({ action, x, y, buttons: event.buttons ?? 0 });
     }
 
     inputLayer.addEventListener("pointerdown", event => {
