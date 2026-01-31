@@ -61,13 +61,6 @@
       ctx.stroke();
     }
 
-    function drawPlayer(player) {
-      ctx.fillStyle = "#3498db";
-      ctx.beginPath();
-      ctx.arc(player.x, player.y - renderState.wallY, player.radius, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
     function drawBalls(balls) {
       balls.forEach(ball => {
         if (ball.y < renderState.wallY) {
@@ -98,12 +91,11 @@
       if (!renderState) {
         return;
       }
-      const { width, bottomHeight, player, sling, balls, shootZoneRatio } = renderState;
+      const { width, bottomHeight, sling, balls, shootZoneRatio } = renderState;
       setCanvasSize(width, bottomHeight);
       drawBackground(width, bottomHeight);
       drawShootZone(width, bottomHeight, shootZoneRatio);
       drawSling(sling);
-      drawPlayer(player);
       drawBalls(balls);
     }
 
