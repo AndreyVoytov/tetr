@@ -87,13 +87,13 @@
       xp: 0,
       xpToLevel: 10,
       wall: { hp: 500, max: 500 },
-      player: { x: 0, y: 0, radius: 0, speed: 0 },
-      joystick: { active: false, startX: 0, startY: 0, dx: 0, dy: 0 },
       sling: { x: 0, y: 0 },
       blocks: [],
       blockSize: 0,
       balls: [],
       ammoTemplates: [],
+      sideShots: 0,
+      spreadAngle: 0.2,
       cooldown: 0,
       cooldownDuration: 1,
       upgrades: [],
@@ -107,7 +107,7 @@
     let spawnTimer = 0;
     let attackTimer = 0;
     let frameTimer = 0;
-    const joystickDeadzone = 30;
+    let firedOnPointer = false;
 
     function setupLayout() {
       const aspect = 9 / 16;
@@ -126,10 +126,6 @@
       state.wallThickness = width * 0.05;
       state.bottomHeight = height - state.wallY;
       state.blockSize = Math.floor(width * 0.08);
-      state.player.radius = width * 0.045;
-      state.player.speed = width * 0.4;
-      state.player.x = width * 0.5;
-      state.player.y = state.wallY + state.bottomHeight * 0.65;
       state.sling.x = width * 0.5;
       state.sling.y = state.wallY + state.bottomHeight * 0.25;
 
@@ -167,9 +163,7 @@
         xp: state.xp,
         xpToLevel: state.xpToLevel,
         wall: state.wall,
-        player: state.player,
         sling: state.sling,
-        joystick: state.joystick,
         blocks: state.blocks,
         balls: state.balls,
         ammoTemplates: state.ammoTemplates,
@@ -280,7 +274,7 @@
         if (upgrade.type === "add_ball" && upgrade.ball) {
           state.ammoTemplates.push({
             type: upgrade.ball.type,
-            power: upgrade.ball.power,
+            power: upgrade.ball.basePower,
             color: upgrade.ball.color,
             label: upgrade.ball.label
           });
@@ -295,27 +289,34 @@
           });
         }
       });
+      const levelBonus = Math.max(0, state.level - 1);
+      state.ammoTemplates.forEach(ball => {
+        ball.power += levelBonus;
+      });
+      state.sideShots = state.upgrades.reduce((total, upgrade) => {
+        if (upgrade.type === "side_shots") {
+          return total + (upgrade.amount || 1);
+        }
+        return total;
+      }, 0);
     }
 
-    function shootVolley() {
+    function shootVolley(targetX, targetY) {
       if (state.cooldown > 0 || state.ammoTemplates.length === 0) {
         return;
       }
-      const dirX = state.sling.x - state.player.x;
-      const dirY = state.sling.y - state.player.y;
-      const length = Math.hypot(dirX, dirY) || 1;
+      const dirX = state.sling.x - targetX;
+      const dirY = state.sling.y - targetY;
       const speed = state.width * 0.6;
       const baseAngle = Math.atan2(dirY, dirX);
-      const count = state.ammoTemplates.length;
-      const spreadStep = count > 1 ? 0.12 : 0;
+      const sideShots = state.sideShots || 0;
+      let shotIndex = 0;
 
-      state.ammoTemplates.forEach((ammo, index) => {
-        const offset = (index - (count - 1) / 2) * spreadStep;
-        const angle = baseAngle + offset;
+      function spawnBall(ammo, angle) {
         const vx = Math.cos(angle) * speed;
         const vy = Math.sin(angle) * speed;
         state.balls.push({
-          id: `${Date.now()}-${index}`,
+          id: `${Date.now()}-${shotIndex}`,
           x: state.sling.x,
           y: state.sling.y,
           radius: state.width * 0.02,
@@ -327,6 +328,16 @@
           label: ammo.label,
           material: false
         });
+        shotIndex += 1;
+      }
+
+      state.ammoTemplates.forEach(ammo => {
+        spawnBall(ammo, baseAngle);
+        for (let i = 1; i <= sideShots; i += 1) {
+          const offset = state.spreadAngle * i;
+          spawnBall(ammo, baseAngle - offset);
+          spawnBall(ammo, baseAngle + offset);
+        }
       });
 
       state.ammoTemplates = [];
@@ -392,7 +403,7 @@
           type: "add_ball",
           ball: {
             type: found.ballType,
-            power: found.basePower + state.level,
+            basePower: found.basePower,
             color: found.color,
             label: found.label
           }
@@ -404,6 +415,12 @@
           type: "boost",
           target: found.target,
           amount
+        });
+      }
+      if (found.type === "side_shots") {
+        state.upgrades.push({
+          type: "side_shots",
+          amount: found.amount || 1
         });
       }
       state.upgradeChoices = [];
@@ -441,19 +458,6 @@
       if (attackTimer >= 1) {
         attackTimer = 0;
         applyWallDamage();
-      }
-
-      if (state.joystick.active) {
-        const length = Math.hypot(state.joystick.dx, state.joystick.dy);
-        if (length >= joystickDeadzone) {
-          const speed = state.player.speed * dt;
-          const moveX = (state.joystick.dx / length) * speed;
-          const moveY = (state.joystick.dy / length) * speed;
-          state.player.x = Math.min(Math.max(state.player.x + moveX, state.player.radius), state.width - state.player.radius);
-          const minY = state.wallY + state.player.radius + state.wallThickness * 0.4;
-          const maxY = state.height - state.player.radius;
-          state.player.y = Math.min(Math.max(state.player.y + moveY, minY), maxY);
-        }
       }
 
       const wallTop = state.wallY - state.wallThickness * 0.5;
@@ -494,35 +498,26 @@
 
     function handleInput(message) {
       const { action, x, y, buttons } = message;
+      const shootZoneTop = state.height - state.bottomHeight * state.shootZoneRatio;
+      const inShootZone = y >= shootZoneTop;
       if (action === "start") {
-        state.joystick.active = true;
-        state.joystick.startX = x;
-        state.joystick.startY = y;
-        state.joystick.dx = 0;
-        state.joystick.dy = 0;
+        firedOnPointer = false;
+        if (inShootZone) {
+          shootVolley(x, y);
+          firedOnPointer = true;
+        }
       }
       if (action === "move") {
-        if (!state.joystick.active && buttons > 0) {
-          state.joystick.active = true;
-          state.joystick.startX = x;
-          state.joystick.startY = y;
-          state.joystick.dx = 0;
-          state.joystick.dy = 0;
-        }
-        if (state.joystick.active) {
-          state.joystick.dx = x - state.joystick.startX;
-          state.joystick.dy = y - state.joystick.startY;
+        if (!firedOnPointer && buttons > 0 && inShootZone) {
+          shootVolley(x, y);
+          firedOnPointer = true;
         }
       }
       if (action === "end") {
-        const shootZoneTop = state.height - state.bottomHeight * state.shootZoneRatio;
-        const inShootZone = state.player.y >= shootZoneTop;
-        if (inShootZone) {
-          shootVolley();
+        if (!firedOnPointer && inShootZone) {
+          shootVolley(x, y);
         }
-        state.joystick.active = false;
-        state.joystick.dx = 0;
-        state.joystick.dy = 0;
+        firedOnPointer = false;
       }
     }
 
